@@ -37,8 +37,8 @@ def train(epoch):
         images = Variable(images)
         labels = Variable(labels)
 
-        labels = labels.cuda()
-        images = images.cuda()
+        # labels = labels.cuda()
+        # images = images.cuda()
 
         optimizer.zero_grad()
         outputs = net(images)
@@ -48,12 +48,14 @@ def train(epoch):
 
         n_iter = (epoch - 1) * len(cifar100_training_loader) + batch_index + 1
 
+        # use tensorboard 记录最后一层梯度的2范数
         last_layer = list(net.children())[-1]
         for name, para in last_layer.named_parameters():
             if 'weight' in name:
                 writer.add_scalar('LastLayerGradients/grad_norm2_weights', para.grad.norm(), n_iter)
             if 'bias' in name:
                 writer.add_scalar('LastLayerGradients/grad_norm2_bias', para.grad.norm(), n_iter)
+
 
         print('Training Epoch: {epoch} [{trained_samples}/{total_samples}]\tLoss: {:0.4f}\tLR: {:0.6f}'.format(
             loss.item(),
@@ -66,10 +68,15 @@ def train(epoch):
         #update training loss for each iteration
         writer.add_scalar('Train/loss', loss.item(), n_iter)
 
+    # 每个epoch计算一次直方图
     for name, param in net.named_parameters():
         layer, attr = os.path.splitext(name)
         attr = attr[1:]
         writer.add_histogram("{}/{}".format(layer, attr), param, epoch)
+
+    # for name, param in net.named_parameters():
+    #     if 'weight' in name or 'bias' in name:
+    #         writer.add_histogram(name, param.clone().cpu().data.numpy(), n_iter)
 
 def eval_training(epoch):
     net.eval()
@@ -81,8 +88,8 @@ def eval_training(epoch):
         images = Variable(images)
         labels = Variable(labels)
 
-        images = images.cuda()
-        labels = labels.cuda()
+        # images = images.cuda()
+        # labels = labels.cuda()
 
         outputs = net(images)
         loss = loss_function(outputs, labels)
@@ -100,13 +107,17 @@ def eval_training(epoch):
     writer.add_scalar('Test/Average loss', test_loss / len(cifar100_test_loader.dataset), epoch)
     writer.add_scalar('Test/Accuracy', correct.float() / len(cifar100_test_loader.dataset), epoch)
 
+    # tensorboard 记录图像（可以用于记录生成图片）
+    # x = torchvision.utils.make_grid(images, normalize=True, scale_each=True)
+    # writer.add_image('Image', x, n_iter)
+
     return correct.float() / len(cifar100_test_loader.dataset)
 
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     parser.add_argument('-net', type=str, required=True, help='net type')
-    parser.add_argument('-gpu', type=bool, default=True, help='use gpu or not')
+    parser.add_argument('-gpu', type=bool, default=False, help='use gpu or not')
     parser.add_argument('-w', type=int, default=2, help='number of workers for dataloader')
     parser.add_argument('-b', type=int, default=128, help='batch size for dataloader')
     parser.add_argument('-s', type=bool, default=True, help='whether shuffle the dataset')
@@ -145,8 +156,8 @@ if __name__ == '__main__':
         os.mkdir(settings.LOG_DIR)
     writer = SummaryWriter(log_dir=os.path.join(
             settings.LOG_DIR, args.net, settings.TIME_NOW))
-    input_tensor = torch.Tensor(12, 3, 32, 32).cuda()
-    writer.add_graph(net, Variable(input_tensor, requires_grad=True))
+    input_tensor = torch.Tensor(12, 3, 32, 32)
+    writer.add_graph(net, (Variable(input_tensor, requires_grad=True),))
 
     #create checkpoint folder to save model
     if not os.path.exists(checkpoint_path):

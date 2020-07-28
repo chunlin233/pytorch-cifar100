@@ -12,3 +12,8 @@ class Settings:
                 setattr(self, attr, getattr(settings, attr))
 
 settings = Settings(settings)
+
+if __name__ == "__main__":
+    print(dir(settings))
+    print(getattr(settings, 'EPOCH'))
+    print(settings.EPOCH)
